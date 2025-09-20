@@ -7,21 +7,28 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const server = http.createServer(app);
+const port = 3001;
+
+// --- CORS Configuration ---
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://uber-ryde-monorepo.vercel.app" // <-- ADD YOUR VERCEL URL HERE
+  "https://uber-ryde-monorepo.vercel.app"
 ];
+
+app.use(cors({
+  origin: allowedOrigins
+}));
+
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST", "PATCH"]
   }
 });
-const port = 3001;
 
-app.use(cors());
 app.use(express.json());
 
+// --- Logger Middleware ---
 app.use((req, res, next) => {
   console.log(`Request received: ${req.method} ${req.originalUrl}`);
   next();
@@ -32,30 +39,17 @@ app.use((req, res, next) => {
 app.post('/api/rides', async (req, res) => {
   try {
     let { pickup_location, destination_location, rider_id, fare, driver_id } = req.body;
-
     if (!driver_id) {
-      const { data: availableDrivers, error: driverError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'DRIVER')
-        .eq('driver_status', 'APPROVED')
-        .not('current_location', 'is', null)
-        .limit(1);
-
+      const { data: availableDrivers, error: driverError } = await supabase.from('profiles').select('id').eq('role', 'DRIVER').eq('driver_status', 'APPROVED').not('current_location', 'is', null).limit(1);
       if (driverError || !availableDrivers || availableDrivers.length === 0) {
-        // --- CHANGE: Instead of an error, assign a placeholder driver ---
-        // IMPORTANT: Replace this with a REAL driver's user ID from your Supabase 'profiles' table for best results.
         driver_id = '00000000-0000-0000-0000-000000000000'; 
-        console.log('No real drivers available. Assigning to placeholder driver.');
-        // -----------------------------------------------------------------
+        console.log('No real drivers available. Assigning to placeholder.');
       } else {
         driver_id = availableDrivers[0].id;
       }
     }
-
     const { data, error } = await supabase.from('rides').insert([{ pickup_location, destination_location, rider_id, fare, driver_id, status: 'REQUESTED' }]).select().single();
     if (error) throw error;
-
     io.to(driver_id).emit('new-ride-request', data);
     console.log(`Ride request sent to driver ${driver_id}`);
     res.status(201).json(data);
@@ -83,33 +77,18 @@ app.patch('/api/rides/:rideId/accept', async (req, res) => {
   }
 });
 
-// In uberryde-server/index.js
-
 app.patch('/api/rides/:rideId/decline', async (req, res) => {
-  try {
-    const { rideId } = req.params;
-
-    // We can set the driver_id to null and status back to a "searching" state,
-    // or a new 'declined' state. For simplicity, let's just update the status.
-    // In a real app, you would have logic here to find the *next* nearest driver.
-    const { data, error } = await supabase
-      .from('rides')
-      .update({ status: 'DECLINED' }) // You'll need to add 'DECLINED' to your table's CHECK constraint
-      .eq('id', rideId)
-      .select('rider_id')
-      .single();
-
-    if (error) throw error;
-
-    // Notify the rider that the driver declined
-    io.emit(`ride-update-${data.rider_id}`, { status: 'DECLINED' });
-
-    res.status(200).json({ message: 'Ride declined.' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to decline ride.' });
-  }
+    try {
+      const { rideId } = req.params;
+      const { data, error } = await supabase.from('rides').update({ status: 'DECLINED' }).eq('id', rideId).select('rider_id').single();
+      if (error) throw error;
+      io.emit(`ride-update-${data.rider_id}`, { status: 'DECLINED' });
+      res.status(200).json({ message: 'Ride declined.' });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to decline ride.' });
+    }
 });
-// Restored simple "start" endpoint (No OTP)
+
 app.patch('/api/rides/:rideId/start', async (req, res) => {
   try {
     const { rideId } = req.params;
@@ -147,7 +126,7 @@ app.get('/api/rides/history/:userId', async (req, res) => {
   }
 });
 
-/* ------------------ DRIVER ENDPOINTS ------------------ */
+/* ------------------ DRIVER & VEHICLE ENDPOINTS ------------------ */
 
 app.post('/api/driver/vehicle', async (req, res) => {
   try {
