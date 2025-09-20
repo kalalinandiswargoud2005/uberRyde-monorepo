@@ -1,0 +1,6 @@
+# Dependencies
+uberryde-client/node_modules/
+uberryde-server/node_modules/
+
+# Environment variables
+.env

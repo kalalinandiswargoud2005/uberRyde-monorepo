@@ -1,0 +1,6 @@
+{
+  "/page": "app/page.js",
+  "/driver/page": "app/driver/page.js",
+  "/pay/page": "app/pay/page.js",
+  "/completion/page": "app/completion/page.js"
+}
