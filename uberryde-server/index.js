@@ -7,9 +7,13 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://uber-ryde-monorepo.vercel.app" // <-- ADD YOUR VERCEL URL HERE
+];
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PATCH"]
   }
 });
