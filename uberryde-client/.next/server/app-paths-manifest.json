@@ -1,5 +1,7 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
+  "/driver/page": "app/driver/page.js",
   "/pay/page": "app/pay/page.js",
-  "/driver/page": "app/driver/page.js"
+  "/login/page": "app/login/page.js"
 }
