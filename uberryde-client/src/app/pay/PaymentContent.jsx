@@ -15,7 +15,8 @@ export default function PaymentContent() {
 
   useEffect(() => {
     if (rideFare) {
-      fetch('http://localhost:3001/api/create-payment-intent', { // Remember to change this to your live backend URL
+      // --- THIS IS THE FIX: Use backticks (`) for the URL ---
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/create-payment-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: Math.round(parseFloat(rideFare) * 100) }), 
@@ -32,7 +33,7 @@ export default function PaymentContent() {
     <>
       <h1 className="text-2xl font-bold mb-4 text-center">Complete Your Payment</h1>
       <p className="text-center text-lg mb-6">Total Amount: <span className="font-bold">₹{rideFare}</span></p>
-
+      
       {clientSecret && (
         <Elements options={options} stripe={stripePromise}>
           <CheckoutForm />

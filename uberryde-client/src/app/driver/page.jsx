@@ -4,7 +4,8 @@ import io from 'socket.io-client';
 import { supabase } from '@/lib/supabase/client';
 import { MapPin, Star } from 'lucide-react';
 
-const socket = io('http://localhost:3001');
+// Initialize socket using the environment variable
+const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL);
 
 export default function DriverDashboard() {
   const [availableRides, setAvailableRides] = useState([]);
@@ -46,17 +47,20 @@ export default function DriverDashboard() {
     return () => clearInterval(locationInterval);
   }, [driver]);
 
+  // ✅ Updated handleRideAction
   const handleRideAction = async (rideId, action) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/rides/${rideId}/${action}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/rides/${rideId}/${action}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
       });
-      const partialUpdate = await response.json();
+      const partialUpdate = await response.json(); // only { rider_id, status }
       if (!response.ok) throw new Error(partialUpdate.error || `Failed to ${action} ride.`);
-      
-      // Correctly merge the update without losing existing ride data
-      setMyRides(prev => prev.map(r => r.id === rideId ? { ...r, ...partialUpdate } : r));
+
+      // Merge update with existing ride to keep all fields intact
+      setMyRides(prev =>
+        prev.map(r => r.id === rideId ? { ...r, ...partialUpdate } : r)
+      );
     } catch (error) {
       alert('Error: ' + error.message);
     }
@@ -65,7 +69,7 @@ export default function DriverDashboard() {
   const handleAcceptRide = async (ride) => {
     if (!driver) return alert('You must be logged in.');
     try {
-      const response = await fetch(`http://localhost:3001/api/rides/${ride.id}/accept`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/rides/${ride.id}/accept`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ driver_id: driver.id }),
@@ -107,8 +111,22 @@ export default function DriverDashboard() {
         </div>
         {(onAccept || buttonInfo) && (
           <div className="bg-gray-50 p-4">
-            {onAccept && <button onClick={() => onAccept(ride)} className="w-full bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-indigo-600 transition">Accept Ride</button>}
-            {buttonInfo && <button onClick={() => handleRideAction(ride.id, buttonInfo.action)} className={`w-full text-white font-bold py-2.5 px-4 rounded-lg transition ${buttonInfo.className}`}>{buttonInfo.text}</button>}
+            {onAccept && (
+              <button
+                onClick={() => onAccept(ride)}
+                className="w-full bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-indigo-600 transition"
+              >
+                Accept Ride
+              </button>
+            )}
+            {buttonInfo && (
+              <button
+                onClick={() => handleRideAction(ride.id, buttonInfo.action)}
+                className={`w-full text-white font-bold py-2.5 px-4 rounded-lg transition ${buttonInfo.className}`}
+              >
+                {buttonInfo.text}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -135,25 +153,55 @@ export default function DriverDashboard() {
             </div>
             <div className="bg-yellow-50 p-4 rounded-lg">
               <p className="text-sm font-medium text-yellow-700">Your Rating</p>
-              <p className="text-3xl font-bold text-yellow-800 flex items-center justify-center">5.0 <Star size={24} className="ml-1 text-yellow-400 fill-current" /></p>
+              <p className="text-3xl font-bold text-yellow-800 flex items-center justify-center">
+                5.0 <Star size={24} className="ml-1 text-yellow-400 fill-current" />
+              </p>
             </div>
           </div>
         </div>
         
         <div className="mb-6">
           <nav className="flex space-x-4 border-b border-gray-200">
-            <button onClick={() => setActiveTab('available')} className={`py-3 px-4 font-medium text-sm rounded-t-lg transition ${activeTab === 'available' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>
+            <button
+              onClick={() => setActiveTab('available')}
+              className={`py-3 px-4 font-medium text-sm rounded-t-lg transition ${
+                activeTab === 'available'
+                  ? 'border-b-2 border-indigo-500 text-indigo-600'
+                  : 'text-gray-500 hover:text-indigo-600'
+              }`}
+            >
               Available Rides ({availableRides.length})
             </button>
-            <button onClick={() => setActiveTab('my-rides')} className={`py-3 px-4 font-medium text-sm rounded-t-lg transition ${activeTab === 'my-rides' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-indigo-600'}`}>
+            <button
+              onClick={() => setActiveTab('my-rides')}
+              className={`py-3 px-4 font-medium text-sm rounded-t-lg transition ${
+                activeTab === 'my-rides'
+                  ? 'border-b-2 border-indigo-500 text-indigo-600'
+                  : 'text-gray-500 hover:text-indigo-600'
+              }`}
+            >
               My Rides ({myRides.length})
             </button>
           </nav>
         </div>
 
+        {/* ✅ Updated grid with conditions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeTab === 'available' && (availableRides.length > 0 ? availableRides.map(ride => <RideCard key={ride.id} ride={ride} onAccept={handleAcceptRide} />) : <p className="text-gray-500 col-span-full">Waiting for ride requests...</p>)}
-          {activeTab === 'my-rides' && (myRides.length > 0 ? myRides.map(ride => <RideCard key={ride.id} ride={ride} />) : <p className="text-gray-500 col-span-full">You have no active or completed rides.</p>)}
+          {activeTab === 'available' &&
+            (availableRides.length > 0 ? (
+              availableRides.map((ride) => (
+                <RideCard key={ride.id} ride={ride} onAccept={handleAcceptRide} />
+              ))
+            ) : (
+              <p className="text-gray-500 col-span-full">Waiting for ride requests...</p>
+            ))}
+
+          {activeTab === 'my-rides' &&
+            (myRides.length > 0 ? (
+              myRides.map((ride) => <RideCard key={ride.id} ride={ride} />)
+            ) : (
+              <p className="text-gray-500 col-span-full">You have no active or completed rides.</p>
+            ))}
         </div>
       </div>
     </div>

@@ -326,6 +326,9 @@
   .h-screen {
     height: 100vh;
   }
+  .min-h-full {
+    min-height: 100%;
+  }
   .min-h-screen {
     min-height: 100vh;
   }
@@ -657,9 +660,6 @@
   .text-black {
     color: var(--color-black);
   }
-  .text-blue-600 {
-    color: var(--color-blue-600);
-  }
   .text-gray-300 {
     color: var(--color-gray-300);
   }
@@ -716,10 +716,6 @@
   }
   .text-yellow-800 {
     color: var(--color-yellow-800);
-  }
-  .antialiased {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
   .opacity-5 {
     opacity: 5%;

@@ -6,36 +6,24 @@ import io from 'socket.io-client'
 import { UserCircle, Star } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-// Initialize socket
-const socket = io('http://localhost:3001')
+// Initialize socket using the environment variable
+const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL)
 
-// Define libraries array outside of the component
 const libraries = ['places']
+const containerStyle = { width: '100%', height: '100vh' }
+const center = { lat: 28.6139, lng: 77.2090 }
 
-const containerStyle = {
-  width: '100%',
-  height: '100vh'
-}
-
-// Default map center
-const center = {
-  lat: 28.6139,
-  lng: 77.2090
-}
-
-// Haversine distance formula to calculate distance between two lat/lng points
+// Haversine distance formula
 function haversineDistance(coords1, coords2) {
-  function toRad(x) {
-    return x * Math.PI / 180
-  }
-  const R = 6371 // Earth's radius in km
-  const dLat = toRad(coords2.lat - coords1.lat)
-  const dLon = toRad(coords2.lng - coords1.lng)
-  const lat1 = toRad(coords1.lat)
-  const lat2 = toRad(coords2.lat)
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
+  function toRad(x) { return x * Math.PI / 180 }
+  const R = 6371;
+  const dLat = toRad(coords2.lat - coords1.lat);
+  const dLon = toRad(coords2.lng - coords1.lng);
+  const lat1 = toRad(coords1.lat);
+  const lat2 = toRad(coords2.lat);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 function MapComponent() {
@@ -59,7 +47,7 @@ function MapComponent() {
   const [distanceToDriver, setDistanceToDriver] = useState(null)
   const [finalFare, setFinalFare] = useState(null)
 
-  // Refs for Autocomplete inputs
+  // Refs
   const originRef = useRef(null)
   const destinationRef = useRef(null)
 
@@ -103,7 +91,7 @@ function MapComponent() {
     const fetchDrivers = async () => {
       if (!origin) return
       try {
-        const response = await fetch(`http://localhost:3001/api/drivers/available?lat=${origin.lat}&lng=${origin.lng}`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/drivers/available?lat=${origin.lat}&lng=${origin.lng}`)
         if (!response.ok) throw new Error('Failed to fetch drivers.')
         const drivers = await response.json()
         setNearbyDrivers(drivers)
@@ -118,10 +106,8 @@ function MapComponent() {
   useEffect(() => {
     if (activeRide && activeRide.rider_id) {
       const rideUpdateChannel = `ride-update-${activeRide.rider_id}`
-
       socket.on(rideUpdateChannel, (data) => {
         if (data.status) setRideStatus(data.status);
-
         if (data.status === 'ACCEPTED' && data.driverInfo) {
           setAssignedDriver(data.driverInfo)
         }
@@ -130,10 +116,9 @@ function MapComponent() {
         }
         if (data.status === 'COMPLETED') {
           setFinalFare(data.fare)
-          setDriverLocation(null) // Clear driver marker
+          setDriverLocation(null)
         }
       })
-
       return () => socket.off(rideUpdateChannel)
     }
   }, [activeRide])
@@ -149,13 +134,10 @@ function MapComponent() {
   // Handle the main ride request button click
   async function handleRequestRide() {
     if (!origin || !destination) return alert("Please select both pickup and destination.")
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return alert('You must be logged in to request a ride.')
-    
     if (nearbyDrivers.length === 0) return alert("No drivers available nearby.")
 
-    // Find nearest driver
     let nearestDriver = null
     let minDistance = Infinity
     nearbyDrivers.forEach(driver => {
@@ -168,11 +150,12 @@ function MapComponent() {
 
     if (!nearestDriver) return alert("Could not determine the nearest driver.")
     
-    console.log(`Nearest driver is ${nearestDriver.id}, at ${minDistance.toFixed(2)} km away.`)
-    const estimatedFare = parseFloat((minDistance * 20 + 40).toFixed(2)) // Example fare calculation
+    const estimatedFare = parseFloat((minDistance * 20 + 40).toFixed(2))
 
     try {
-      const response = await fetch('http://localhost:3001/api/rides', {
+      // --- THIS IS THE FIX ---
+      // Use backticks ` ` to correctly insert the environment variable
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/rides`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -199,7 +182,6 @@ function MapComponent() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Show booking form ONLY when a driver has not been assigned */}
       {!assignedDriver && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-white p-4 rounded-lg shadow-lg w-full max-w-md">
           <h2 className="text-lg font-bold mb-2">Book a Ride</h2>
@@ -216,17 +198,14 @@ function MapComponent() {
         </div>
       )}
 
-      {/* Show driver info panel AFTER a driver is assigned */}
       {assignedDriver && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-          {/* Show this panel DURING the ride */}
           {rideStatus !== 'COMPLETED' && (
             <div>
               <h2 className="text-lg font-bold">
                 {rideStatus === 'ACCEPTED' ? 'Your driver is on the way!' : 'Trip in Progress'}
               </h2>
               {distanceToDriver && <p className="text-gray-600">{distanceToDriver} km away</p>}
-
               <div className="flex items-center mt-4 p-4 border rounded-lg">
                 <UserCircle size={48} className="text-gray-600" />
                 <div className="ml-4 flex-grow">
@@ -244,7 +223,6 @@ function MapComponent() {
             </div>
           )}
 
-          {/* Show this panel AFTER the ride is completed */}
           {rideStatus === 'COMPLETED' && (
             <div className="text-center">
               <h2 className="text-2xl font-bold">Trip Completed!</h2>
@@ -265,13 +243,9 @@ function MapComponent() {
         {origin && <Marker position={origin} />}
         {destination && <Marker position={destination} />}
         {directionsResponse && <DirectionsRenderer directions={directionsResponse} />}
-
-        {/* Live driver location (only show if a driver is assigned) */}
         {assignedDriver && driverLocation && (
           <Marker position={driverLocation} icon={{ url: '/car-icon.svg', scaledSize: new window.google.maps.Size(40, 40) }} />
         )}
-
-        {/* Nearby drivers markers (only show if no driver is assigned yet) */}
         {!assignedDriver && nearbyDrivers.map((driver) => (
           <Marker key={driver.id} position={driver.current_location} icon={{ url: '/car-icon.svg', scaledSize: new window.google.maps.Size(40, 40) }} />
         ))}

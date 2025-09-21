@@ -9,7 +9,7 @@ export default function DriverApplicationPage() {
     model: '',
     year: '',
     license_plate: '',
-    vehicle_type: 'Sedan', // Default value
+    vehicle_type: 'Sedan',
   });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -30,7 +30,9 @@ export default function DriverApplicationPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/driver/vehicle', {
+      // --- THIS IS THE FIX ---
+      // Use backticks (`) to correctly insert the backend URL
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/driver/vehicle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...vehicle, driver_id: user.id }),
@@ -42,7 +44,7 @@ export default function DriverApplicationPage() {
       }
 
       alert('Application submitted successfully! Your account is pending approval.');
-      router.push('/driver'); // Redirect to the driver dashboard
+      router.push('/driver');
     } catch (error) {
       alert('Error: ' + error.message);
     } finally {

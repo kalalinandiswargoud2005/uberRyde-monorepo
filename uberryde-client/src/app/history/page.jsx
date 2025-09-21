@@ -2,25 +2,28 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import ReviewModal from '../components/ReviewModal';
-import jsPDF from 'jspdf'; // Import jsPDF
+import jsPDF from 'jspdf';
 
 export default function HistoryPage() {
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState(null);
   const [selectedRide, setSelectedRide] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setUserId(user.id);
-        fetch(`http://localhost:3001/api/rides/history/${user.id}`)
-          .then((res) => res.json())
-          .then((data) => {
-            setRides(data);
-            setLoading(false);
-          });
+        try {
+          // --- FIX #1: Use backticks (`) for the URL ---
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/rides/history/${user.id}`);
+          if (!response.ok) throw new Error('Could not fetch ride history.');
+          const data = await response.json();
+          setRides(data);
+        } catch (error) {
+          console.error(error);
+        } finally {
+          setLoading(false);
+        }
       } else {
         setLoading(false);
       }
@@ -30,7 +33,8 @@ export default function HistoryPage() {
 
   const handleReviewSubmit = async (reviewData) => {
     try {
-      const response = await fetch('http://localhost:3001/api/reviews', {
+      // --- FIX #2: Use backticks (`) for the URL ---
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reviewData),
@@ -44,29 +48,28 @@ export default function HistoryPage() {
     }
   };
 
-  // --- NEW: Function to generate and download a PDF receipt ---
   const handleDownloadReceipt = (ride) => {
     const doc = new jsPDF();
-
+    
     doc.setFontSize(22);
     doc.text("uberRyde Ride Receipt", 105, 20, { align: 'center' });
-
+    
     doc.setFontSize(12);
     doc.text(`Ride ID: ${ride.id}`, 14, 40);
     doc.text(`Date: ${new Date(ride.created_at).toLocaleString()}`, 14, 50);
-
-    doc.line(14, 60, 196, 60); // horizontal line
-
+    
+    doc.line(14, 60, 196, 60);
+    
     doc.setFontSize(16);
     doc.text("Total Fare", 14, 70);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text(`₹${ride.fare}`, 196, 70, { align: 'right' });
-
+    
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text("Thank you for riding with uberRyde!", 105, 90, { align: 'center' });
-
+    
     doc.save(`uberryde-receipt-${ride.id.substring(0, 8)}.pdf`);
   };
 
@@ -74,7 +77,7 @@ export default function HistoryPage() {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto p-8">
+      <div className="max-w-4xl mx-auto p-8 bg-gray-50 min-h-full">
         <h1 className="text-3xl font-bold mb-6">Your Ride History</h1>
         <div className="space-y-4">
           {rides.length > 0 ? (
@@ -89,22 +92,21 @@ export default function HistoryPage() {
                   <p><strong>Fare:</strong> ₹{ride.fare}</p>
                 </div>
                 <div className="flex gap-2">
-                  {/* --- NEW: Download Receipt Button --- */}
                   {ride.status === 'COMPLETED' && (
-                    <button
-                      onClick={() => handleDownloadReceipt(ride)}
-                      className="bg-gray-600 text-white font-semibold py-2 px-4 rounded hover:bg-gray-700"
-                    >
-                      Download Receipt
-                    </button>
-                  )}
-                  {ride.status === 'COMPLETED' && (
-                    <button
-                      onClick={() => setSelectedRide(ride)}
-                      className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600"
-                    >
-                      Leave a Review
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleDownloadReceipt(ride)}
+                        className="bg-gray-600 text-white font-semibold py-2 px-4 rounded hover:bg-gray-700"
+                      >
+                        Download Receipt
+                      </button>
+                      <button
+                        onClick={() => setSelectedRide(ride)}
+                        className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600"
+                      >
+                        Leave a Review
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
